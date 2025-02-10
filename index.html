@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课程表</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            user-select: none; /* 禁止选择文本 */
+        }
+        #clock {
+            font-size: 5em;
+            cursor: pointer;
+        }
+        #schedule {
+            display: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #eee;
+        }
+        td[contenteditable="true"]:focus {
+            outline: none; /* 移除输入框的默认边框 */
+        }
+        #addRowButton, #deleteRowButton {
+            margin-top: 10px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="clock"></div>
+    <div id="schedule">
+        <table>
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>周一</th>
+                    <th>周二</th>
+                    <th>周三</th>
+                    <th>周四</th>
+                    <th>周五</th>
+                    <th>周六</th>
+                    <th>周日</th>
+                </tr>
+            </thead>
+            <tbody id="scheduleBody">
+                <!-- 默认数据 -->
+                <tr>
+                    <td>08:00 - 09:00</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                </tr>
+                <tr>
+                    <td>09:00 - 10:00</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                </tr>
+                <tr>
+                    <td>10:00 - 11:00</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                </tr>
+                <tr>
+                    <td>14:00 - 15:00</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                </tr>
+                <tr>
+                    <td>15:00 - 16:00</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                </tr>
+                <tr>
+                    <td>16:00 - 17:00</td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                    <td contenteditable="true"></td>
+                </tr>
+                <!-- 其他时间段可以按需添加 -->
+            </tbody>
+            <tbody id="additionalRows">
+                <!-- 动态添加的行 -->
+            </tbody>
+        </table>
+        <button id="addRowButton">添加行</button>
+        <button id="deleteRowButton">删除行</button>
+    </div>
+    <script>
+        const alarmSound = new Audio('G:\\myGame\\clock\\8813.wav');
+        let alarmTriggered = false;
+
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+            //voiceReminder(); // 每秒检查一次
+        }
+
+        function showSchedule() {
+            document.getElementById('clock').style.display = 'none';
+            document.getElementById('schedule').style.display = 'block';
+            startAutoReturnToClock();
+        }
+
+        function showClock() {
+            document.getElementById('clock').style.display = 'block';
+            document.getElementById('schedule').style.display = 'none';
+        }
+
+        let autoReturnTimeout;
+        function startAutoReturnToClock() {
+            clearTimeout(autoReturnTimeout);
+            autoReturnTimeout = setTimeout(() => {
+                if (!editing) {
+                    showClock();
+                }
+            }, 2000);
+        }
+
+        document.body.addEventListener('click', (event) => {
+            if (!event.target.closest('#schedule')) {
+                showSchedule();
+            }
+        });
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 保存编辑数据
+        let editing = false;
+        function bindCellEvents(cell) {
+            cell.addEventListener('focus', () => {
+                editing = true;
+                clearTimeout(autoReturnTimeout);
+            });
+            cell.addEventListener('blur', () => {
+                saveDefaultRows();
+                saveAdditionalRows();
+                editing = false;
+                startAutoReturnToClock();
+            });
+        }
+
+        document.querySelectorAll('#scheduleBody td[contenteditable="true"]').forEach(cell => {
+            bindCellEvents(cell);
+        });
+
+        // 保存默认行数据到 localStorage
+        function saveDefaultRows() {
+            const rows = document.querySelectorAll('#scheduleBody tr');
+            const defaultRowsData = [];
+            rows.forEach(row => {
+                const rowData = [];
+                row.querySelectorAll('td').forEach(cell => {
+                    rowData.push(cell.textContent);
+                });
+                defaultRowsData.push(rowData);
+            });
+            localStorage.setItem('defaultRowsData', JSON.stringify(defaultRowsData));
+        }
+
+        // 加载默认行数据从 localStorage
+        function loadDefaultRows() {
+            const defaultRowsData = JSON.parse(localStorage.getItem('defaultRowsData'));
+            if (defaultRowsData) {
+                const table = document.querySelector('#scheduleBody');
+                table.innerHTML = '';
+                defaultRowsData.forEach(rowData => {
+                    const newRow = document.createElement('tr');
+                    rowData.forEach(cellData => {
+                        const newCell = document.createElement('td');
+                        newCell.textContent = cellData;
+                        newCell.setAttribute('contenteditable', 'true');
+                        bindCellEvents(newCell);
+                        newRow.appendChild(newCell);
+                    });
+                    table.appendChild(newRow);
+                });
+            }
+        }
+
+        // 添加新行功能
+        document.getElementById('addRowButton').addEventListener('click', () => {
+            const table = document.querySelector('#additionalRows');
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+                <td contenteditable="true"></td>
+            `;
+            table.appendChild(newRow);
+
+            // 重新绑定事件
+            newRow.querySelectorAll('td[contenteditable="true"]').forEach(cell => {
+                bindCellEvents(cell);
+            });
+
+            saveAdditionalRows();
+        });
+
+        // 删除最底下的行功能
+        document.getElementById('deleteRowButton').addEventListener('click', () => {
+            const table = document.querySelector('#additionalRows');
+            if (table.lastChild) {
+                table.removeChild(table.lastChild);
+                saveAdditionalRows();
+            }
+        });
+
+        // 保存动态添加的行数据到 localStorage
+        function saveAdditionalRows() {
+            const rows = document.querySelectorAll('#additionalRows tr');
+            const additionalRowsData = [];
+            rows.forEach(row => {
+                const rowData = [];
+                row.querySelectorAll('td').forEach(cell => {
+                    rowData.push(cell.textContent);
+                });
+                additionalRowsData.push(rowData);
+            });
+            localStorage.setItem('additionalRowsData', JSON.stringify(additionalRowsData));
+        }
+
+        // 加载动态添加的行数据从 localStorage
+        function loadAdditionalRows() {
+            const additionalRowsData = JSON.parse(localStorage.getItem('additionalRowsData'));
+            if (additionalRowsData) {
+                const table = document.querySelector('#additionalRows');
+                table.innerHTML = '';
+                additionalRowsData.forEach(rowData => {
+                    const newRow = document.createElement('tr');
+                    rowData.forEach(cellData => {
+                        const newCell = document.createElement('td');
+                        newCell.textContent = cellData;
+                        newCell.setAttribute('contenteditable', 'true');
+                        bindCellEvents(newCell);
+                        newRow.appendChild(newCell);
+                    });
+                    table.appendChild(newRow);
+                });
+            }
+        }
+
+        loadDefaultRows();
+        loadAdditionalRows();
+
+        // 语音提醒功能
+        function voiceReminder() {
+            if (alarmTriggered) return; // 防止重复触发
+
+            const now = new Date();
+            const day = now.getDay();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const scheduleBody = document.querySelector('#scheduleBody');
+            const additionalRows = document.querySelector('#additionalRows');
+
+            const checkRows = (rows) => {
+                Array.from(rows).forEach(row => {
+                    const timeCell = row.cells[0].textContent;
+                    const times = timeCell.split(' - ');
+                    const [startHour, startMinute] = times[0].split(':').map(Number);
+                    let endHour, endMinute;
+
+                    if (times.length > 1) {
+                        [endHour, endMinute] = times[1].split(':').map(Number);
+                    }
+
+                    console.log(`Checking row with time: ${timeCell}`);
+                    console.log(`Current time: ${hours}:${minutes}`);
+                    if (times.length!= 1)
+                    {
+                    if (hours === startHour && minutes === startMinute) {
+                        const subject = row.cells[day].textContent || '课程';
+                        playAlarm(() => {
+                            const msg = new SpeechSynthesisUtterance(`${subject}上课时间到了`);
+                            window.speechSynthesis.speak(msg);
+                            alarmTriggered = true; // 设置标志，防止重复触发
+                        });
+                    }
+
+                    if (endHour !== undefined && hours === endHour && minutes === endMinute) {
+                        const subject = row.cells[day].textContent || '课程';
+                        playAlarm(() => {
+                            const msg = new SpeechSynthesisUtterance(`现在是${subject}下课时间`);
+                            window.speechSynthesis.speak(msg);
+                            alarmTriggered = true; // 设置标志，防止重复触发
+                        });
+                    }
+                    }
+                    // 处理只有一个时间点的情况
+                    if (times.length === 1 && hours === startHour && minutes === startMinute) {
+                        const subject = row.cells[day].textContent || '课程';
+                        playAlarm(() => {
+                            const msg = new SpeechSynthesisUtterance(`${subject}时间到了`);
+                            window.speechSynthesis.speak(msg);
+                            alarmTriggered = true; // 设置标志，防止重复触发
+                        });
+                    }
+                });
+            };
+
+            checkRows(scheduleBody.rows);
+            checkRows(additionalRows.rows);
+        }
+
+        function playAlarm(callback) {
+            const audio = new Audio('G:\\myGame\\clock\\8813.wav'); // 确保 8813.wav 文件存在
+            audio.addEventListener('ended', () => {
+                if (callback) callback();
+            });
+            audio.addEventListener('canplaythrough', () => {
+                console.log('Audio file is ready to play.');
+                audio.play();
+            });
+            audio.addEventListener('error', (e) => {
+                console.error('Error playing audio file:', e);
+                if (callback) callback();
+            });
+        }
+
+        setInterval(voiceReminder, 6000); // 每10秒检查一次
+    </script>
+</body>
+</html>
